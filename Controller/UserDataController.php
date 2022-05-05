@@ -31,14 +31,26 @@ class UserDataController extends CommonApiController
             return new JsonResponse(['html' => $content['html']]);
         }
 
-        $ct = substr($content['url'], 4);
-        if ($leadId = (int)ClickthroughHelper::decodeArrayFromUrl($ct)['lead']) {
-//            $leadId = 25242;
-            $lead = $this->em->getRepository('MauticLeadBundle:Lead')->getEntity($leadId);
+        if ($content['url']) {
+            $ct = substr($content['url'], 4);
 
-            if (!$lead) {
-                return new JsonResponse(['error' => 'No lead was found by requested ID']);
+            try {
+                $clickthrough = ClickthroughHelper::decodeArrayFromUrl($ct);
+                $leadId = $clickthrough['lead'];
+            } catch (\Exception $e) {
+                return new JsonResponse(['error' => $e]);
             }
+        } elseif ($content['cookie']) {
+            $leadId = hexdec(base64_decode($content['cookie']));
+        }
+
+        $lead = null;
+        if (isset($leadId) && (int)$leadId) {
+            $lead = $this->em->getRepository('MauticLeadBundle:Lead')->getEntity($leadId);
+        }
+
+        if (!$lead) {
+            return new JsonResponse(['error' => 'No lead was found by requested ID']);
         }
 
         $slugs = [];
@@ -53,6 +65,6 @@ class UserDataController extends CommonApiController
 
         $html = str_replace($matches[0], $slugs, $content['html']);
 
-        return new JsonResponse(['html' => $html]);
+        return new JsonResponse(['html' => $html, 'ct' => base64_encode(dechex($leadId))]);
     }
 }

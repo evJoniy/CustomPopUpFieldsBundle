@@ -9,11 +9,6 @@
  * @license     GNU/GPLv3 http://www.gnu.org/licenses/gpl-3.0.html
  */
 
-use Symfony\Component\Dotenv\Dotenv;
-
-$env = new Dotenv();
-$env->loadEnv(MAUTIC_ROOT_DIR . '/.env');
-
 $style = $focus['style'];
 $props = $focus['properties'];
 $useScrollEvent = in_array($props['when'], ['scroll_slight', 'scroll_middle', 'scroll_bottom']);
@@ -30,15 +25,7 @@ if ($useTimeout) {
 
 $debug = ('dev' == $app->getEnvironment()) ? 'true' : 'false';
 
-$domain = str_ends_with($_ENV['DOMAIN'], '/')
-    ? $_ENV['DOMAIN']
-    : $_ENV['DOMAIN'] . '/';
-
-$domain = substr($domain, 0, 7) === "http://"
-    ? $domain
-    : 'http://' . $domain;
-
-$targetURL = $domain . 'api/popup/';
+$targetURL = 'DOMAIN/popup';
 
 $animate = (!isset($props['animate']) || !empty($props['animate']));
 $linkActivation = (!isset($props['link_activation']) || !empty($props['link_activation']));
@@ -106,44 +93,53 @@ switch ($style) {
                 Focus.insertStyleIntoHead();
                 Focus.registerFocusEvent();
 
-                // Add class to body
-                Focus.addClass(document.getElementsByTagName('body')[0], 'MauticFocus<?php echo ucfirst($style); ?>');
+                const collapser = document.getElementsByClassName('mf-bar-collapser')[0];
+                const spacer = document.getElementsByClassName('mf-bar-spacer')[0];
+
+                Focus.iframe.style.display = "none";
+                collapser.style.display = 'none';
+                spacer.style.display = 'none';
 
                 const mfContentList = Focus.iframeDoc.getElementsByClassName('mf-content');
                 if (mfContentList[0]) {
-                    const collapser = document.getElementsByClassName('mf-bar-collapser-icon')[0];
-                    //collapser.style.display = 'none';
                     const mfContent = mfContentList[0];
                     const htmlToReplace = mfContent.innerHTML;
                     const urlParams = /[^/]*$/.exec(window.location.href)[0];
-                    const data = JSON.stringify({"url": urlParams, "html": htmlToReplace});
+                    const cookie = getCookie('popup');
+                    const data = JSON.stringify({url: urlParams, cookie: cookie, html: htmlToReplace});
 
                     $.ajax({
                         type: 'POST',
-                        //headers: headers,
                         url: '<?php echo $targetURL; ?>',
-                        //'Access-Control-Request-Headers': 'x-requested-with',
-                        //
-                        //beforeSend: function(request) {
-                        //    request.setRequestHeader("Authorization", 'Basic YWRtaW46YWRtaW4=');
-                        //    request.setRequestHeader('Content-Type', 'application/json');
-                        //},
-                        data: {data},
+                        'Access-Control-Request-Headers': 'x-requested-with',
+
+                        beforeSend: function (request) {
+                            request.setRequestHeader("Authorization", 'Basic YXBpOmFwaWFwaQ==');
+                            request.setRequestHeader('Content-Type', 'application/json');
+                        },
+                        data: data,
                         success: function (response) {
-                            response = JSON.parse(response);
                             if (response.error) {
+                                Focus.iframe.remove();
+                                collapser.remove();
+                                spacer.remove();
                                 console.log(response.error);
-                            }
-                            if (response.html !== undefined) {
-                                mfContent.innerHTML = response.html;
-                                Focus.iframe.style.display = "block";
-                                const collapser = document.getElementsByClassName('mf-bar-collapser-icon')[0];
-                                collapser.style.display = 'block';
+                            } else {
+                                if (response.html !== null) {
+                                    mfContent.innerHTML = response.html;
+                                    Focus.iframe.style.height = '60px';
+                                    Focus.iframe.style.display = "block";
+                                    collapser.style.display = 'block';
+                                    spacer.style.display = 'block';
+                                    setCookie('popup', response.ct);
+                                }
                             }
                         }
                     })
                     ;
                 }
+                // Add class to body
+                Focus.addClass(document.getElementsByTagName('body')[0], 'MauticFocus<?php echo ucfirst($style); ?>');
             },
 
             // Register click events for toggling bar, closing windows, etc
@@ -663,7 +659,6 @@ switch ($style) {
 
                 Focus.iframe = document.createElement('iframe');
                 Focus.iframe.style.border = 0;
-                Focus.iframe.style.display = "none";
                 Focus.iframe.style.width = "100%";
                 Focus.iframe.style.height = "100%";
                 Focus.iframe.src = "about:blank";
@@ -806,3 +801,28 @@ switch ($style) {
     // Initialize
     MauticFocus<?php echo $focus['id']; ?>().initialize();
 })(window);
+
+function setCookie(name, value, days) {
+    var expires = "";
+    if (days) {
+        var date = new Date();
+        date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
+        expires = "; expires=" + date.toUTCString();
+    }
+    document.cookie = name + "=" + (value || "") + expires + "; path=/";
+}
+
+function getCookie(name) {
+    var nameEQ = name + "=";
+    var ca = document.cookie.split(';');
+    for (var i = 0; i < ca.length; i++) {
+        var c = ca[i];
+        while (c.charAt(0) === ' ') c = c.substring(1, c.length);
+        if (c.indexOf(nameEQ) === 0) return c.substring(nameEQ.length, c.length);
+    }
+    return null;
+}
+
+function eraseCookie(name) {
+    document.cookie = name + '=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;';
+}
