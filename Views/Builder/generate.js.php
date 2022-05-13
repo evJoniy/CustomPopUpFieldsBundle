@@ -107,7 +107,6 @@ switch ($style) {
                 Focus.iframe.style.display = "none";
 
                 const mfContentList = Focus.iframeDoc.getElementsByClassName('mf-content');
-                console.log(mfContentList[0]);
                 if (mfContentList[0]) {
                     const mfContent = mfContentList[0];
                     const htmlToReplace = mfContent.innerHTML;
