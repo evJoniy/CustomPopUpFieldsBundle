@@ -9,6 +9,8 @@
  * @license     GNU/GPLv3 http://www.gnu.org/licenses/gpl-3.0.html
  */
 
+use Mautic\CoreBundle\Loader\ParameterLoader;
+
 $style = $focus['style'];
 $props = $focus['properties'];
 $useScrollEvent = in_array($props['when'], ['scroll_slight', 'scroll_middle', 'scroll_bottom']);
@@ -25,7 +27,8 @@ if ($useTimeout) {
 
 $debug = ('dev' == $app->getEnvironment()) ? 'true' : 'false';
 
-$targetURL = 'DOMAIN/popup';
+$siteUrl = (new ParameterLoader())->getLocalParameterBag()->get('site_url');
+$targetURL = $siteUrl . 'popup';
 
 $animate = (!isset($props['animate']) || !empty($props['animate']));
 $linkActivation = (!isset($props['link_activation']) || !empty($props['link_activation']));
@@ -96,11 +99,15 @@ switch ($style) {
                 const collapser = document.getElementsByClassName('mf-bar-collapser')[0];
                 const spacer = document.getElementsByClassName('mf-bar-spacer')[0];
 
+                if (collapser && spacer) {
+                    collapser.style.display = 'none';
+                    spacer.style.display = 'none';
+                }
+
                 Focus.iframe.style.display = "none";
-                collapser.style.display = 'none';
-                spacer.style.display = 'none';
 
                 const mfContentList = Focus.iframeDoc.getElementsByClassName('mf-content');
+                console.log(mfContentList[0]);
                 if (mfContentList[0]) {
                     const mfContent = mfContentList[0];
                     const htmlToReplace = mfContent.innerHTML;
@@ -114,7 +121,6 @@ switch ($style) {
                         'Access-Control-Request-Headers': 'x-requested-with',
 
                         beforeSend: function (request) {
-                            request.setRequestHeader("Authorization", 'Basic YXBpOmFwaWFwaQ==');
                             request.setRequestHeader('Content-Type', 'application/json');
                         },
                         data: data,
@@ -127,10 +133,15 @@ switch ($style) {
                             } else {
                                 if (response.html !== null) {
                                     mfContent.innerHTML = response.html;
-                                    Focus.iframe.style.height = '60px';
+                                    if (Focus.iframe.classList.contains('mf-bar-iframe')) {
+                                        Focus.iframe.style.height = '60px';
+                                    }
+                                    if (collapser && spacer) {
+                                        collapser.style.display = 'block';
+                                        spacer.style.display = 'block';
+                                    }
                                     Focus.iframe.style.display = "block";
-                                    collapser.style.display = 'block';
-                                    spacer.style.display = 'block';
+
                                     setCookie('popup', response.ct);
                                 }
                             }
